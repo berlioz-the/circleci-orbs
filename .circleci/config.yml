@@ -1,0 +1,79 @@
+version: 2.1
+
+description: Berlioz Orb for running apps in the cloud
+
+executors:
+  berlioz:
+    docker:
+      - image: berliozcloud/circleci
+    # working_directory: /workspace
+
+commands:
+
+  init:
+    parameters:
+      user:
+        type: string
+      pass:
+        type: string
+    steps:
+      - run:
+          name: Berlioz Login
+          command: berlioz login --user << parameters.user >> --pass << parameters.pass >>
+
+  deploy:
+    parameters:
+      region:
+        type: string
+      deployment:
+        type: string
+    steps:
+      - run:
+          name: Deploy to << parameters.deployment >> environment in << parameters.region >> region
+          command: berlioz deploy --deployment << parameters.deployment >> --region << parameters.region >> --wait
+
+  execute:
+    parameters:
+      command:
+        type: string
+    steps:
+      - run:
+          name: berlioz << parameters.command >>
+          command: berlioz << parameters.command >>
+
+
+jobs:
+  deploy:
+    executor: berlioz
+    steps:
+      - checkout
+      - setup_remote_docker
+      - init:
+          user: $BERLIOZ_USER
+          pass: $BERLIOZ_PASS
+      - deploy:
+          deployment: gprod
+          region: -west1-c
+
+examples:
+  main:
+    description: Deploy to test, then to production
+    usage:
+      version: 2.1
+      orbs:
+        tf: berlioz/berlioz@0.0.1
+      workflows:
+        tf:
+          jobs:
+            - tf/validate:
+                name: validate
+            - tf/plan:
+                name: plan
+                requires: [validate]
+            - tf/apply:
+                name: apply
+                requires: [plan]
+                filters:
+                  branches:
+                    only: master
+
